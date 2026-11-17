@@ -105,6 +105,7 @@ export class MRPlacement {
         const p = pos || headPos.clone().addScaledVector(headFwd, 0.45).add(new THREE.Vector3(0, -0.5, 0));
         this.placing = false; this.reticle.visible = false; this.status = pos ? 'anchored' : 'floating';
         this.anchorAt(frame, p, yaw);
+        this.onPlaced?.();
         return { pos: p, yaw, placed: true };
       }
       return pos ? { pos, yaw, preview: true } : null;

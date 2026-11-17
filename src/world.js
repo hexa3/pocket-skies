@@ -456,12 +456,12 @@ export class Burst {
     parent.add(this.pts);
     this.parts = [];
   }
-  emit(x, y, z, color, n = 40, speed = 0.12) {
+  emit(x, y, z, color, n = 40, speed = 0.12, life = 1) {
     const c = new THREE.Color(color);
     for (let i = 0; i < n; i++) {
       if (this.parts.length >= this.max) this.parts.shift();
       const a = Math.random() * Math.PI * 2, u = Math.random();
-      this.parts.push({ x, y, z, vx: Math.cos(a) * speed * u, vy: speed * (0.6 + Math.random()), vz: Math.sin(a) * speed * u, life: 1.2 + Math.random() * 0.8, c });
+      this.parts.push({ x, y, z, vx: Math.cos(a) * speed * u, vy: speed * (0.6 + Math.random()), vz: Math.sin(a) * speed * u, life: (1.2 + Math.random() * 0.8) * life, c });
     }
   }
   update(dt) {

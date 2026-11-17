@@ -13,6 +13,10 @@ import { MRPlacement } from './mr.js';
 const params = new URLSearchParams(location.search);
 const DEBUG = params.has('debug');
 const SHOW_FPS = params.has('fps');
+// ?capture: deterministic frame-by-frame mode used to record the trailer (each step = 1/24 s of game time).
+const CAPTURE = params.has('capture');
+let gameTime = 0, captureGate = 0, captureFrame = 0, captureResolve = null;
+if (CAPTURE) window.__capture = { speed: 1, next() { captureGate++; return new Promise((r) => { captureResolve = r; }); }, get frame() { return captureFrame; } };
 
 // ======================= Renderer / scene =======================
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
@@ -59,6 +63,7 @@ const halo = new THREE.Mesh(new THREE.RingGeometry(0.034, 0.04, 40), new THREE.M
 halo.visible = false; board.add(halo);
 
 const mr = new MRPlacement(scene);
+mr.onPlaced = () => { showTitle(); sfx('win'); };
 
 // ======================= Save data =======================
 const SAVE_KEY = 'pocketskies.v1';
@@ -349,9 +354,14 @@ function updateHold(holder, ctx) {
     if (g.kind === 'cloud') target.copy(pl).add(h.offset);
     else target.copy(h.start).addScaledVector(pl.sub(h.handStart), 1.7);
   } else if (h.via === 'headgaze') {
+    // relative: the object moves by how far your gaze moves (no jump on pickup)
     const r = localRay(ctx.origin, ctx.dir);
-    if (g.kind === 'cloud') { const hit = rayPlaneY(r, p.y); if (!hit) return; target.copy(hit); target.y = p.y; }
-    else { const hit = rayPlaneY(r, 0); if (!hit) return; target.set(hit.x, 0.1, hit.z); }
+    if (g.kind === 'cloud') { const hit = rayPlaneY(r, p.y); if (!hit) return; target.copy(hit).add(h.offset); target.y = p.y; }
+    else {
+      const hit = rayPlaneY(r, 0); if (!hit) return;
+      if (!h.gazeStart) h.gazeStart = hit.clone();
+      target.copy(h.start).addScaledVector(hit.sub(h.gazeStart), 1.5);
+    }
   } else if (h.via === 'mouse') {
     const r = localRay(ctx.origin, ctx.dir);
     if (g.kind === 'cloud') { const hit = rayPlaneY(r, p.y); if (!hit) return; target.copy(hit).add(h.offset); target.y = p.y; }
@@ -454,7 +464,7 @@ function onSelectEnd(inp) {
 }
 
 // ---- Head-gaze dwell: fully hands-free play (accessibility) ----
-const headGaze = { held: null, dwell: 0, dwellKey: null, block: null, still: 0, last: new THREE.Vector3() };
+const headGaze = { held: null, dwell: 0, dwellKey: null, block: null, still: 0, moved: 0, last: new THREE.Vector3() };
 const reticle = new THREE.Group();
 {
   const ringM = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9, depthTest: false });
@@ -479,11 +489,15 @@ function updateHeadGaze(dt, camW, camDir) {
     updateHold(headGaze, ctx);
     headGaze.held.g.view.hover = 1;
     const p = posOf(headGaze.held.g, new THREE.Vector3());
-    headGaze.still = p.distanceTo(headGaze.last) < 0.004 * scaleNow() ? headGaze.still + dt : 0;
+    const step = p.distanceTo(headGaze.last);
+    headGaze.moved += step;
+    headGaze.still = step < 0.004 * scaleNow() * Math.max(dt * 24, 0.0001) ? headGaze.still + dt : 0;
     headGaze.last.copy(p);
-    fill.scale.setScalar(Math.max(0.001, 1 - headGaze.still / 1.4));
+    // drop after holding still for 1.4 s, but only once you've actually moved it (or 3 s regardless)
+    const need = headGaze.moved > 0.02 * scaleNow() ? 1.4 : 3.0;
+    fill.scale.setScalar(Math.max(0.001, 1 - headGaze.still / need));
     reticle.position.copy(p); reticle.lookAt(camW);
-    if (headGaze.still > 1.4) { headGaze.block = headGaze.held.g; headGaze.held = null; sfx('drop'); idleT = 0; }
+    if (headGaze.still > need) { headGaze.block = headGaze.held.g; headGaze.held = null; sfx('drop'); idleT = 0; }
     return;
   }
   const t = findTarget(ctx.origin, ctx.dir, null);
@@ -499,7 +513,7 @@ function updateHeadGaze(dt, camW, camDir) {
     if (k && headGaze.dwell >= 1.1) {
       headGaze.dwell = 0; headGaze.block = k;
       if (t.type === 'button') pressButton(t.b);
-      else { beginHold(headGaze, { ...t, mode: 'ray' }, ctx); headGaze.still = 0; headGaze.last.copy(posOf(t.g)); }
+      else { beginHold(headGaze, { ...t, mode: 'ray' }, ctx); headGaze.still = 0; headGaze.moved = 0; headGaze.last.copy(posOf(t.g)); }
     }
   }
   reticle.position.copy(camW).addScaledVector(camDir, t ? Math.max(0.2, t.d - 0.01) : 0.6);
@@ -607,7 +621,7 @@ async function startSession(mode) {
     xrSession = session;
     mrMode = mode === 'immersive-ar';
     sky.visible = scenery.visible = !mrMode;
-    shadowCatcher.visible = mrMode; VIS.mr = mrMode; showTitle();
+    shadowCatcher.visible = mrMode; VIS.mr = mrMode; if (!mrMode) showTitle();
     renderer.setClearAlpha(mrMode ? 0 : 1);
     await renderer.xr.setSession(session);
     renderer.xr.setFoveation?.(1);
@@ -738,7 +752,7 @@ function updateSpirit(dt, t) {
   const glow = 0.045 + 0.008 * Math.sin(t * 5) + (idleT > 20 && !won ? 0.02 * Math.abs(Math.sin(t * 3)) : 0);
   spirit.sprite.scale.setScalar(glow);
   spirit.sprite.visible = !menu && !(mrMode && mr.placing);
-  if (Math.random() < dt * 14) spirit.trail.emit(x, y, z, 0xd8b8ff, 1, 0.01);
+  if (Math.random() < dt * 14) spirit.trail.emit(x, y, z, 0xd8b8ff, 1, 0.01, 0.25);
   spirit.trail.update(dt);
   if (spirit.sayT > 0) { spirit.sayT -= dt; if (spirit.sayT <= 0 && !hint) spirit.say = ''; }
 }
@@ -752,7 +766,7 @@ function applyQuality() {
   sunLight.castShadow = quality.tier < 3;
 }
 function updateQuality(dt, xr) {
-  if (!xr) { quality.warm = 0; return; }
+  if (!xr || CAPTURE) { quality.warm = 0; return; }
   quality.warm += dt; if (quality.warm < 4) return; // let the session settle
   quality.acc += dt; quality.n++;
   if (quality.acc >= 2) {
@@ -784,9 +798,16 @@ let rainLevel = -1, fpsAcc = 0, fpsN = 0;
 const PLANT_COLORS = { bloom: 0xff7fb0, fern: 0x7fffe0, cactus: 0xff6fa0 };
 
 renderer.setAnimationLoop((time, frame) => {
-  const dt = Math.min(0.05, clock.getDelta());
-  const t = clock.elapsedTime;
-  fpsAcc += dt; fpsN++; if (fpsAcc > 0.5) { fps = fpsN / fpsAcc; fpsAcc = 0; fpsN = 0; }
+  let dt = Math.min(0.05, clock.getDelta());
+  let advanced = false;
+  if (CAPTURE) {
+    if (captureGate > 0) { captureGate--; dt = window.__capture.speed / 24; advanced = true; captureFrame++; } else dt = 0;
+  }
+  gameTime += dt;
+  const t = gameTime;
+  window.__gameTime = gameTime;
+  if (advanced) window.__director?.(gameTime, dt);
+  if (dt > 0) { fpsAcc += dt; fpsN++; if (fpsAcc > 0.5) { fps = fpsN / fpsAcc; fpsAcc = 0; fpsN = 0; } }
   pressCool = Math.max(0, pressCool - dt);
   const xr = renderer.xr.isPresenting;
 
@@ -833,8 +854,17 @@ renderer.setAnimationLoop((time, frame) => {
       const tip = joint(inp, 'index-finger-tip');
       if (tip) {
         tip.getWorldPosition(tipW);
+        // A poke only counts when the fingertip enters the button from its front face,
+        // so a hand sweeping past or resting near the console never presses anything.
+        inp.pokeZ ||= new Map();
         for (const b of activeButtons()) {
-          if (b.pokeTest(tipW)) { b.hover = 1; if (!inp.poke.has(b)) { inp.poke.add(b); pressButton(b); } }
+          const l = b.group.worldToLocal(tmpV.copy(tipW));
+          const inXY = Math.abs(l.x) < b.w / 2 && Math.abs(l.y) < b.h / 2;
+          const inside = inXY && l.z < 0.012 && l.z > -0.03;
+          const prevZ = inp.pokeZ.get(b);
+          inp.pokeZ.set(b, l.z);
+          if (inXY && l.z < 0.04 && l.z > -0.03) b.hover = 1;
+          if (inside) { if (!inp.poke.has(b)) { inp.poke.add(b); if (prevZ !== undefined && prevZ >= 0.012) pressButton(b); } }
           else inp.poke.delete(b);
         }
       }
@@ -927,10 +957,11 @@ renderer.setAnimationLoop((time, frame) => {
 
   drawInfo(false);
   renderer.render(scene, camera);
+  if (advanced && captureResolve) { const r = captureResolve; captureResolve = null; requestAnimationFrame(() => r(captureFrame)); }
 });
 
 applySize();
 rebuildGarden();
 refreshTiles();
 loadLevel(LEVELS[0]);
-if (DEBUG) window.__ps = { get spirit() { return spirit; }, btnHint, quality, get state() { return state; }, inputs, renderer, camera, board, THREE, loadLevel, LEVELS, dailyLevel, mr, ghost, save, btns: { btnNext, btnRetry, btnLevels, btnOpts }, opts: { oHC, oGaze, oSize }, get fps() { return fps; } };
+if (DEBUG) window.__ps = { headGaze, get spirit() { return spirit; }, btnHint, quality, rebuildGarden, refreshTiles, openMenu, applyQuality, get state() { return state; }, inputs, renderer, camera, board, THREE, loadLevel, LEVELS, dailyLevel, mr, ghost, save, btns: { btnNext, btnRetry, btnLevels, btnOpts }, opts: { oHC, oGaze, oSize }, get fps() { return fps; } };

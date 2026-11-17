@@ -32,6 +32,7 @@ export function setMuted(m) { muted = m; if (master) master.gain.setTargetAtTime
 export const isMuted = () => muted;
 
 export function setRain(level) { // 0..1
+  window.__sfxLog?.push([window.__gameTime, 'rain', level]);
   if (!ctx) return;
   rainGain.gain.setTargetAtTime(Math.min(0.18, level * 0.09), ctx.currentTime, 0.3);
 }
@@ -45,6 +46,7 @@ function tone(freq, t0, dur, vol = 0.12, type = 'sine') {
 const hz = (semi, base = 523.25) => base * Math.pow(2, semi / 12);
 
 export function sfx(name, i = 0) {
+  window.__sfxLog?.push([window.__gameTime, name, i]);
   if (!ctx || muted) return;
   const t = ctx.currentTime;
   switch (name) {
@@ -71,7 +73,9 @@ export function sfx(name, i = 0) {
 
 // A soft warm hum while you hold the sun.
 let hum = null;
+let humOn = false;
 export function setHum(on) {
+  if (on !== humOn) { humOn = on; window.__sfxLog?.push([window.__gameTime, 'hum', on ? 1 : 0]); }
   if (!ctx || muted) { if (hum) { hum.g.gain.setTargetAtTime(0, ctx.currentTime, 0.1); } return; }
   if (!hum) {
     const o = ctx.createOscillator(), o2 = ctx.createOscillator(), g = ctx.createGain();
