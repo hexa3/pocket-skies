@@ -46,10 +46,9 @@ A tiny island sits on your real desk and you are its weather. Pinch the sun, dra
 ## What excites us about the future of VR
 Glasses-sized headsets will live on desks and in laps. We think the best experiences will be small, tactile worlds that share your real space and reward a minute of play, not an hour.
 
-## Video script (≤ 2:45). Record on a Quest 3 in MR at a real desk
-1. **0:00–0:10:** Close shot of the island resting on the desk. A hand pinches the sun and sweeps it, and the shadows race across the grass and onto the real table. Title: *Pocket Skies*.
-2. **0:10–0:35:** First launch: the hand icon shows the pinch, you copy it, and the flower blooms in about 20 s. The icon then shows the poke on Next.
-3. **0:35–1:15:** The "aha": tilt the sun so the cloud's shadow slides off the flower while rain keeps falling. Fern in a long rock shadow (Two Sides). Cactus drying out (Desert Heart).
-4. **1:15–1:45:** Grand Garden: get stuck, poke Hint, and the Sky Spirit explains the problem and shows the move. Poke Do it. Win burst, butterflies, stars.
-5. **1:45–2:15:** Accessibility: one hand, far pinch, head-gaze mode completing an island hands-free, high contrast, Bigger.
-6. **2:15–2:40:** Reason to come back: garden flowers on the rim, the streak tree, the Daily Island. Take the headset off and put it back on, and the island is still on the desk. End card with the URL.
+## Video
+`media/pocket-skies-trailer.mp4` (1:29, 720p, with soundtrack). Upload it to YouTube as **Public**, titled "Pocket Skies — you are the weather (Meta VR Start 2026)", and paste the link into Devpost.
+
+The trailer shows real gameplay recorded in **Meta's Immersive Web Emulator (IWER)** with an emulated Quest 3, tracked hands and the **Synthetic Environment Module's** home-office room as passthrough. The rules allow this ("via XR Simulator or another equivalent emulator"). Every move in it is a real pinch, poke or gaze input, and the one sped-up section is captioned "time-lapse". Soundtrack: a procedurally composed bed plus the game's own sound events at the moments they happened.
+
+Scenes: island placed on the desk (hit-test + plane detection) → ghost-hand tutorial → pinch the sun → poke Next → drag the rain cloud → Two Sides shadow puzzle → Sky Spirit Hint / Do it → full bloom with butterflies → hands-free head-gaze play → home garden, streak tree and Daily Island → end card.
