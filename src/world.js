@@ -1,6 +1,34 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { K, NEEDS, rockSpheres, waterState, happy } from './sim.js';
 
+export const VIS = { hc: false };
+
+// Merge every non-instanced mesh under `group` into one mesh per material (fewer draw calls on Quest).
+export function bake(group) {
+  group.updateMatrixWorld(true);
+  const inv = group.matrixWorld.clone().invert();
+  const byMat = new Map(), keep = [];
+  group.traverse((o) => {
+    if (o === group) return;
+    if (o.isInstancedMesh || o.isSprite || o.isPoints || o.isLine) { keep.push(o); return; }
+    if (!o.isMesh) return;
+    let g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
+    for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k);
+    g.applyMatrix4(inv.clone().multiply(o.matrixWorld));
+    if (!byMat.has(o.material)) byMat.set(o.material, { geos: [], cast: false, recv: false });
+    const e = byMat.get(o.material); e.geos.push(g); e.cast ||= o.castShadow; e.recv ||= o.receiveShadow;
+  });
+  const out = new THREE.Group();
+  out.position.copy(group.position); out.quaternion.copy(group.quaternion); out.scale.copy(group.scale);
+  out.userData = group.userData;
+  for (const [mat, e] of byMat) {
+    const m = new THREE.Mesh(mergeGeometries(e.geos), mat);
+    m.castShadow = e.cast; m.receiveShadow = e.recv; out.add(m);
+  }
+  for (const o of keep) { o.updateMatrixWorld(true); o.matrix.copy(inv.clone().multiply(o.matrixWorld)); o.matrix.decompose(o.position, o.quaternion, o.scale); out.add(o); }
+  return out;
+}
 const flat = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.9, metalness: 0, flatShading: true, ...extra });
 
 function jitter(geo, amt, seed = 1, keepTop = false) {
@@ -64,19 +92,19 @@ export function makeScenery(scene) {
     const a = (i / 9) * Math.PI * 2 + 0.4, d = 7 + (i % 3) * 3;
     const isl = makeIsland(0.6 + (i % 4) * 0.35, i + 3, 0.5);
     isl.position.set(Math.sin(a) * d, -1.2 + (i % 4) * 1.1, Math.cos(a) * d);
-    isl.userData.bob = i;
     for (let k = 0; k < 3; k++) {
       const tree = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.4, 6), flat(0x3f8f4f));
       tree.position.set(Math.sin(k * 2.2 + i) * 0.3, 0.2, Math.cos(k * 2.2 + i) * 0.3);
       isl.add(tree);
     }
-    grp.add(isl);
+    const baked = bake(isl); baked.userData.bob = i;
+    grp.add(baked);
   }
   for (let i = 0; i < 14; i++) {
     const c = makeCloudMesh(0.6 + (i % 3) * 0.4, false);
     const a = i * 2.4, d = 12 + (i % 5) * 4;
     c.position.set(Math.sin(a) * d, -2.5 + (i % 4) * 0.4, Math.cos(a) * d);
-    grp.add(c);
+    grp.add(bake(c));
   }
   scene.add(grp);
   return grp;
@@ -92,7 +120,7 @@ export function makeRock(rock) {
     m.castShadow = true; m.receiveShadow = true;
     g.add(m);
   });
-  return g;
+  return bake(g);
 }
 
 // ---------------- Cloud ----------------
@@ -113,7 +141,8 @@ export class CloudView {
   constructor(cloud) {
     this.cloud = cloud;
     this.group = new THREE.Group();
-    this.body = makeCloudMesh(cloud.r);
+    this.body = bake(makeCloudMesh(cloud.r));
+    this.body.scale.y = 0.75;
     this.group.add(this.body);
     // rain
     this.N = 36;
@@ -143,8 +172,8 @@ export class CloudView {
       const d = this.drops[i];
       d.y -= d.v * dt;
       if (d.y < -c.y) this.drops[i] = this.newDrop(false);
-      const q = this.drops[i];
-      p.set([q.x, q.y, q.z, q.x, q.y - 0.012, q.z], i * 6);
+      const q = this.drops[i], o = i * 6;
+      p[o] = q.x; p[o + 1] = q.y; p[o + 2] = q.z; p[o + 3] = q.x; p[o + 4] = q.y - 0.012; p[o + 5] = q.z;
     }
     this.rainGeo.attributes.position.needsUpdate = true;
     this.foot.position.y = -c.y + 0.002;
@@ -152,7 +181,7 @@ export class CloudView {
     const s = this.body.scale.x + (target - this.body.scale.x) * Math.min(1, dt * 12);
     this.body.scale.set(s, s * 0.75, s);
     this.body.position.y = Math.sin(t * 1.3 + c.x * 20) * 0.003;
-    this.foot.material.opacity = held || this.hover ? 0.8 : 0.4;
+    this.foot.material.opacity = held || this.hover || VIS.hc ? 0.85 : 0.4;
   }
 }
 
@@ -331,7 +360,7 @@ export class PlantView {
     if (NEEDS[plant.t].water === 'dry') { this.ringMat.uniforms.uLo.value = 0; this.ringMat.uniforms.uHi.value = K.DRY; }
     const ring = new THREE.Mesh(new THREE.PlaneGeometry(0.068, 0.068).rotateX(-Math.PI / 2), this.ringMat);
     ring.position.y = 0.0015; ring.renderOrder = 2;
-    this.group.add(ring);
+    this.group.add(ring); this.ring = ring;
 
     this.icon = new THREE.Sprite(new THREE.SpriteMaterial({ map: iconTexture(plant.t, false, false), depthTest: true, transparent: true }));
     this.icon.scale.set(0.036, 0.018, 1); this.icon.position.y = 0.1; this.icon.renderOrder = 3;
@@ -360,7 +389,7 @@ export class PlantView {
       this.body.scale.set(0.8 + 0.2 * g, 0.45 + 0.55 * g, 0.8 + 0.2 * g);
     }
     // droop & tint
-    const col = this.base.clone();
+    const col = this._col || (this._col = new THREE.Color()); col.copy(this.base);
     let droop = 0;
     if (!p.bloomed) {
       if (ws === 'flooded') { col.lerp(FLOOD, 0.6); droop = 0.35; }
@@ -380,8 +409,11 @@ export class PlantView {
       this.ringMat.uniforms.uGold.value = 1;
     } else {
       this.flower.scale.setScalar(0.001);
-      this.icon.position.y = 0.1 + Math.sin(t * 2 + p.x * 30) * 0.003;
+      const k = VIS.hc ? 1.7 : 1;
+      this.icon.scale.set(0.036 * k, 0.018 * k, 1);
+      this.icon.position.y = (VIS.hc ? 0.115 : 0.1) + Math.sin(t * 2 + p.x * 30) * 0.003;
     }
+    this.ring.scale.setScalar(VIS.hc ? 1.25 : 1);
     this.ringMat.uniforms.uG.value = g;
     this.ringMat.uniforms.uM.value = p.m;
   }
@@ -409,6 +441,8 @@ export class Burst {
     }
   }
   update(dt) {
+    if (!this.parts.length && this.idle) return;
+    this.idle = !this.parts.length;
     let j = 0;
     for (const p of this.parts) {
       p.life -= dt; if (p.life <= 0) continue;
@@ -419,8 +453,9 @@ export class Burst {
     this.parts.length = j;
     for (let i = 0; i < this.max; i++) {
       const p = this.parts[i];
-      if (p) { this.pos.set([p.x, p.y, p.z], i * 3); this.col.set([p.c.r, p.c.g, p.c.b], i * 3); }
-      else this.pos.set([0, -99, 0], i * 3);
+      const o = i * 3;
+      if (p) { this.pos[o] = p.x; this.pos[o + 1] = p.y; this.pos[o + 2] = p.z; this.col[o] = p.c.r; this.col[o + 1] = p.c.g; this.col[o + 2] = p.c.b; }
+      else { this.pos[o] = 0; this.pos[o + 1] = -99; this.pos[o + 2] = 0; }
     }
     this.geo.attributes.position.needsUpdate = true; this.geo.attributes.color.needsUpdate = true;
   }
@@ -440,8 +475,8 @@ export function makeDecor(state, seedStr) {
     }
     return null;
   };
-  const N = 140;
-  const blade = new THREE.ConeGeometry(0.0022, 0.016, 3).translate(0, 0.008, 0);
+  const N = 110;
+  const blade = new THREE.ConeGeometry(0.0018, 0.011, 3).translate(0, 0.0055, 0);
   const inst = new THREE.InstancedMesh(blade, flat(0xffffff), N);
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), sc = new THREE.Vector3(), pos = new THREE.Vector3();
   const c = new THREE.Color();
@@ -451,7 +486,7 @@ export function makeDecor(state, seedStr) {
     e.set((rnd() - 0.5) * 0.5, rnd() * 6.28, (rnd() - 0.5) * 0.5); q.setFromEuler(e);
     const k = 0.6 + rnd() * 0.9; sc.set(k, k, k);
     m.compose(pos.set(s[0], 0, s[1]), q, sc); inst.setMatrixAt(n, m);
-    inst.setColorAt(n, c.setHSL(0.27 + rnd() * 0.07, 0.45, 0.32 + rnd() * 0.15)); n++;
+    inst.setColorAt(n, c.setHSL(0.26 + rnd() * 0.06, 0.5, 0.42 + rnd() * 0.14)); n++;
   }
   inst.count = n; inst.receiveShadow = true;
   g.add(inst);
@@ -466,5 +501,53 @@ export function makeDecor(state, seedStr) {
     const p = new THREE.Mesh(new THREE.DodecahedronGeometry(0.004 + rnd() * 0.004, 0), flat(0xb4b2bc));
     p.position.set(s[0], 0.001, s[1]); p.scale.y = 0.5; p.rotation.y = rnd() * 6; p.receiveShadow = true; g.add(p);
   }
-  return g;
+  return bake(g);
+}
+
+// ---------------- Home garden: grows permanently with every star you earn ----------------
+// Flowers ring the island rim (one per star) and a streak tree on a satellite islet
+// grows one tier per Daily Island completed. Visible growth between sessions.
+export function makeHomeGarden(stars, dailies) {
+  const g = new THREE.Group();
+  const cols = [0xff7fb0, 0xffd25e, 0x9fd0ff, 0xffffff, 0xc59bff, 0xff9f6b];
+  const stemMat = flat(0x4fae4f), headMats = cols.map((c) => flat(c, { emissive: c, emissiveIntensity: 0.25 }));
+  const n = Math.min(stars, 90);
+  for (let i = 0; i < n; i++) {
+    const a = i * 2.39996 + 0.3, r = K.ISLAND_R - 0.006 - (i % 3) * 0.004;
+    const f = new THREE.Group();
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.0012, 0.0012, 0.012, 4).translate(0, 0.006, 0), stemMat);
+    const head = new THREE.Mesh(new THREE.IcosahedronGeometry(0.0042, 0), headMats[i % cols.length]);
+    head.position.y = 0.013;
+    f.add(stem, head);
+    f.position.set(Math.sin(a) * r, 0, Math.cos(a) * r);
+    g.add(f);
+  }
+  // streak islet
+  const islet = makeIsland(0.05, 9, 0.5);
+  islet.position.set(-0.29, -0.06, -0.12);
+  islet.userData.islet = true;
+  const tier = Math.min(dailies, 12);
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.003, 0.005, 1, 6).translate(0, 0.5, 0), flat(0x8a5a3a));
+  const h = 0.015 + tier * 0.006; trunk.scale.y = h; islet.add(trunk);
+  if (tier > 0) {
+    const crown = new THREE.Mesh(new THREE.IcosahedronGeometry(0.012 + tier * 0.003, 0), flat(0x4fbf6a));
+    crown.position.y = h + 0.006 + tier * 0.002; crown.castShadow = true; islet.add(crown);
+    for (let i = 0; i < Math.min(tier, 12); i++) {
+      const fr = new THREE.Mesh(new THREE.SphereGeometry(0.0035, 6, 4), flat(0xff6f6f, { emissive: 0xff3030, emissiveIntensity: 0.3 }));
+      const a = i * 2.4, rr = 0.01 + tier * 0.0025;
+      fr.position.set(Math.sin(a) * rr, crown.position.y + Math.cos(i) * rr * 0.5, Math.cos(a) * rr);
+      islet.add(fr);
+    }
+  } else {
+    const seed = new THREE.Mesh(new THREE.SphereGeometry(0.004, 6, 4), flat(0x7a5a3a)); seed.position.y = 0.003; islet.add(seed); trunk.visible = false;
+  }
+  g.add(bake(islet));
+  return bake(g);
+}
+
+// Transparent plane that catches shadows on your real desk in mixed reality.
+export function makeShadowCatcher() {
+  const m = new THREE.Mesh(new THREE.CircleGeometry(0.6, 48).rotateX(-Math.PI / 2), new THREE.ShadowMaterial({ opacity: 0.35 }));
+  m.receiveShadow = true; m.visible = false;
+  return m;
 }

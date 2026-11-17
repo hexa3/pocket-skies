@@ -3,7 +3,7 @@
 export const LEVELS = [
   {
     id: 'l1', name: 'First Light', par: 20,
-    hint: 'This sprout is stuck in shadow. Pinch the sun and lift it over the rock.',
+    hint: 'Stuck in shadow! Pinch the sun and lift it over the rock.',
     sun: { az: Math.PI, el: 0.16 },
     plants: [{ t: 'bloom', x: 0, z: 0.03, m: 0.6 }],
     rocks: [{ x: 0, z: -0.05, h: 0.1 }],
@@ -11,15 +11,15 @@ export const LEVELS = [
   },
   {
     id: 'l2', name: 'First Rain', par: 30,
-    hint: 'Thirsty! Pinch the cloud and drift it over the sprout. Watch the blue ring fill.',
-    sun: { az: 2.6, el: 1.1 },
+    hint: 'Thirsty! Pinch the cloud and drift it over the sprout.',
+    sun: { az: 2.2, el: 0.8 },
     plants: [{ t: 'bloom', x: 0, z: 0, m: 0 }],
     rocks: [],
     clouds: [{ x: 0.11, y: 0.16, z: -0.07 }],
   },
   {
     id: 'l3', name: 'Shade Lover', par: 25,
-    hint: 'Ferns hate the sun. Lower the sun behind the rock so its long shadow covers the fern.',
+    hint: 'Ferns hate the sun. Drop the sun low behind the rock.',
     sun: { az: 2.0, el: 1.35 },
     plants: [{ t: 'fern', x: 0.05, z: 0.04, m: 0.7 }],
     rocks: [{ x: -0.01, z: -0.01, h: 0.09 }],
@@ -27,7 +27,7 @@ export const LEVELS = [
   },
   {
     id: 'l4', name: 'Desert Heart', par: 25,
-    hint: 'Cacti want dry soil and full sun. Move the cloud away and let it bake.',
+    hint: 'Cacti love dry sunshine. Move that cloud away.',
     sun: { az: 2.8, el: 1.2 },
     plants: [{ t: 'cactus', x: 0, z: 0.02, m: 0.8 }],
     rocks: [],
@@ -35,7 +35,7 @@ export const LEVELS = [
   },
   {
     id: 'l5', name: 'Two Sides', par: 30,
-    hint: 'One sun, two wishes. Find the angle that lights the flower and hides the fern.',
+    hint: 'One sun, two wishes: light the flower, shade the fern.',
     sun: { az: 2.6, el: 1.3 },
     plants: [{ t: 'bloom', x: 0.075, z: 0, m: 0.6 }, { t: 'fern', x: -0.075, z: 0, m: 0.6 }],
     rocks: [{ x: 0, z: 0, h: 0.09 }],
@@ -43,7 +43,7 @@ export const LEVELS = [
   },
   {
     id: 'l6', name: 'Thirsty Trio', par: 45,
-    hint: 'Wet soil stays wet for a while. Water each one, then let the light in.',
+    hint: 'Wet soil stays wet a while. Water each, then let the light in.',
     sun: { az: 2.7, el: 1.0 },
     plants: [{ t: 'bloom', x: -0.1, z: 0.04, m: 0 }, { t: 'bloom', x: 0, z: -0.04, m: 0 }, { t: 'bloom', x: 0.1, z: 0.04, m: 0 }],
     rocks: [],
@@ -51,7 +51,7 @@ export const LEVELS = [
   },
   {
     id: 'l7', name: 'Canyon', par: 60,
-    hint: 'Low sun makes long shadows. Careful: ferns drown if you rain on them too long.',
+    hint: 'Low sun, long shadows. Ferns drown if rained on too long!',
     sun: { az: 3.0, el: 1.4 },
     plants: [{ t: 'fern', x: 0, z: -0.03, m: 0.1 }, { t: 'bloom', x: -0.13, z: 0.08, m: 0.5 }, { t: 'bloom', x: 0.13, z: 0.08, m: 0.5 }],
     rocks: [{ x: -0.055, z: -0.03, h: 0.1 }, { x: 0.055, z: -0.03, h: 0.1 }],
@@ -67,7 +67,7 @@ export const LEVELS = [
   },
   {
     id: 'l9', name: 'Eclipse', par: 50,
-    hint: 'No rocks here. A cloud makes a fine parasol, if its rain falls somewhere else.',
+    hint: 'No rocks! A cloud makes a parasol if its rain falls elsewhere.',
     sun: { az: 3.1, el: 1.45 },
     plants: [{ t: 'fern', x: 0, z: 0, m: 0.45 }, { t: 'bloom', x: -0.11, z: 0.07, m: 0.6 }, { t: 'bloom', x: 0.11, z: 0.07, m: 0.6 }],
     rocks: [],
@@ -139,7 +139,7 @@ export function dailyLevel(key = todayKey()) {
   const [y, m, d] = key.split('-');
   return {
     id: 'daily', name: `Daily Island ${d}/${m}`, par: 25 * plants.length, daily: key,
-    hint: 'A new island grows every day. Same island for everyone. Keep your streak alive!',
+    hint: 'A new island every day, the same for everyone. Keep your streak!',
     sun: { az: R(Math.PI * 0.55, Math.PI * 1.45), el: R(0.3, 1.3) }, plants, rocks, clouds,
   };
 }

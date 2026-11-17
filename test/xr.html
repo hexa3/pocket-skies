@@ -3,8 +3,10 @@
 <body style="margin:0">
 <div id="overlay"><button id="btn-mr" disabled>MR</button><button id="btn-vr" disabled>VR</button><button id="btn-web">web</button></div>
 <script type="module">
-  import { XRDevice, metaQuest3 } from 'iwer';
-  const device = new XRDevice(metaQuest3);
+  // Boots the game inside IWER (Meta's WebXR emulator). ?device=glasses emulates Meta VR Glasses.
+  import { XRDevice, metaQuest3, metaVRGlasses } from 'iwer';
+  const glasses = new URLSearchParams(location.search).get('device') === 'glasses';
+  const device = new XRDevice(glasses ? metaVRGlasses : metaQuest3);
   device.installRuntime({ forceInstall: true });
   device.primaryInputMode = 'hand';
   device.position.set(0, 1.2, 0);
