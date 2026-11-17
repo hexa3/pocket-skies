@@ -4,24 +4,36 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
   <title>Pocket Skies</title>
-  <meta name="description" content="A hands-first VR/MR puzzle garden: pinch the sun, drag the clouds, bloom a tiny island in your lap." />
+  <meta name="description" content="A tiny island sits on your real desk and you are its weather. A hands-first mixed reality puzzle garden for Meta Quest." />
+  <meta name="theme-color" content="#141a30" />
+  <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+  <meta property="og:title" content="Pocket Skies: you are the weather" />
+  <meta property="og:description" content="Pinch the sun, drag the clouds, bloom a tiny island on your real desk. Hands-first mixed reality for Meta Quest." />
+  <meta property="og:image" content="https://hexa3.github.io/pocket-skies/og.jpg" />
+  <meta property="og:type" content="website" />
+  <meta name="twitter:card" content="summary_large_image" />
   <style>
-    :root { --ink: #f4f6ff; --dim: #b8c3e6; --accent: #ffd25e; --bg: #141a30; }
+    :root { --ink: #f4f6ff; --dim: #c3cdee; --accent: #ffd25e; --bg: #141a30; }
     * { box-sizing: border-box; }
     html, body { margin: 0; height: 100%; overflow: hidden; background: #9cc3ef; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink); }
     canvas { display: block; touch-action: none; }
-    #overlay { position: fixed; inset: 0; display: grid; place-items: center; padding: 16px;
-      background: radial-gradient(circle at 50% 30%, rgba(255,210,94,0.35), transparent 50%), linear-gradient(180deg, rgba(40,60,120,0.72), rgba(20,26,48,0.9)); transition: opacity .35s; z-index: 5; }
+    #overlay { position: fixed; inset: 0; display: grid; place-items: center; padding: 16px; overflow-y: auto;
+      background: linear-gradient(180deg, rgba(20,26,48,0.55), rgba(20,26,48,0.92) 70%), url(./hero.jpg) center / cover no-repeat, #141a30; transition: opacity .35s; z-index: 5; }
     #overlay.hidden { opacity: 0; pointer-events: none; }
-    .card { max-width: 560px; width: 100%; text-align: center; }
-    h1 { font-size: clamp(40px, 9vw, 72px); margin: 0 0 6px; letter-spacing: -0.02em; }
+    .card { max-width: 600px; width: 100%; text-align: center; padding: 8px 0; }
+    h1 { font-size: clamp(44px, 10vw, 84px); margin: 0; letter-spacing: -0.03em; text-shadow: 0 4px 24px rgba(0,0,0,0.45); }
     h1 span { color: var(--accent); }
-    p { color: var(--dim); font-size: 17px; line-height: 1.5; margin: 8px 0 22px; }
+    .tag { font-size: clamp(18px, 3.4vw, 24px); font-weight: 700; margin: 4px 0 6px; }
+    p { color: var(--dim); font-size: 17px; line-height: 1.5; margin: 6px 0 20px; }
     .btns { display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
-    button { font: inherit; font-size: 18px; font-weight: 700; padding: 14px 18px; border-radius: 14px; border: 0; cursor: pointer; color: #141a30; background: var(--accent); }
-    button.alt { background: rgba(255,255,255,0.12); color: var(--ink); border: 1px solid rgba(255,255,255,0.25); }
-    button:disabled { opacity: 0.4; cursor: not-allowed; }
-    .small { font-size: 13px; color: var(--dim); margin-top: 16px; }
+    button { font: inherit; font-size: 18px; font-weight: 800; padding: 15px 18px; border-radius: 14px; border: 0; cursor: pointer; color: #141a30; background: var(--accent); box-shadow: 0 6px 20px rgba(255,210,94,0.25); }
+    button small { display: block; font-size: 13px; font-weight: 600; opacity: 0.75; margin-top: 2px; }
+    button.alt { background: rgba(255,255,255,0.12); color: var(--ink); border: 1px solid rgba(255,255,255,0.28); box-shadow: none; }
+    button:disabled { display: none; }
+    .noxr { display: none; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); border-radius: 14px; padding: 12px 14px; font-size: 15px; color: var(--dim); margin-bottom: 4px; }
+    .noxr b { color: var(--accent); }
+    .pills { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 16px; }
+    .pills span { font-size: 12.5px; padding: 5px 10px; border-radius: 999px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.18); color: var(--dim); }
     #help { position: fixed; left: 12px; bottom: 10px; right: 12px; font-size: 13px; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.6); pointer-events: none; z-index: 2; }
   </style>
 </head>
@@ -29,16 +41,26 @@
   <div id="overlay">
     <div class="card">
       <h1>Pocket <span>Skies</span></h1>
-      <p>A tiny island floats in your lap. You are its weather.<br/>Pinch the sun, drag the clouds and bloom every plant. No controllers needed.</p>
+      <div class="tag">You are the weather.</div>
+      <p>A tiny island sits on your desk. Pinch the sun to swing its shadows, drag clouds to make it rain, and bloom every plant. Hands only, no controllers.</p>
       <div class="btns">
-        <button id="btn-mr" disabled>Play in Mixed Reality (on your desk)</button>
-        <button id="btn-vr" class="alt" disabled>Play in VR (floating sky)</button>
-        <button id="btn-web" class="alt">Try in the browser with a mouse</button>
+        <div class="noxr" id="noxr">To play in mixed reality, open <b>hexa3.github.io/pocket-skies</b> in the <b>Meta Quest Browser</b>. You can also try it right here with a mouse.</div>
+        <button id="btn-mr" disabled>Play in Mixed Reality<small>the island lands on your real desk</small></button>
+        <button id="btn-vr" class="alt" disabled>Play in VR<small>a floating island above the clouds</small></button>
+        <button id="btn-web" class="alt">Try it in the browser<small>mouse: drag the sun and clouds</small></button>
       </div>
-      <div class="small">Hands-first · seated · one hand is enough · about 1 minute per island · new Daily Island every day</div>
+      <div class="pills"><span>✋ Hands-first</span><span>🪑 Seated</span><span>⏱ ~1 min per island</span><span>✦ Sky Spirit helper</span><span>♿ Hands-free mode</span><span>🌱 New island daily</span></div>
     </div>
   </div>
-  <div id="help">Drag the sun and clouds · drag empty space to look around · scroll to zoom · R retry · N next · L islands · O options · M sound</div>
+  <div id="help">Drag the sun and clouds · drag empty space to look around · scroll to zoom · H hint · R retry · N next · L islands · O options · M sound</div>
+  <script>
+    // If this device has no WebXR, explain how to play on Quest instead of showing dead buttons.
+    (async () => {
+      let ok = false;
+      try { ok = !!navigator.xr && ((await navigator.xr.isSessionSupported('immersive-ar')) || (await navigator.xr.isSessionSupported('immersive-vr'))); } catch { ok = false; }
+      if (!ok) document.getElementById('noxr').style.display = 'block';
+    })();
+  </script>
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>

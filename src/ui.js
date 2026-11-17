@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 
-const PX = 1400; // canvas pixels per meter
+const PX = 1400; // layout units per meter (drawing code is written in these units)
+const RES = 1.8;  // actual texture pixels per layout unit: crisp text on Quest 3
 
 function roundRect(x, X, Y, w, h, r) {
   x.beginPath(); x.moveTo(X + r, Y); x.arcTo(X + w, Y, X + w, Y + h, r); x.arcTo(X + w, Y + h, X, Y + h, r);
@@ -22,18 +23,19 @@ export class Card {
   constructor(w, h, opts = {}) {
     this.w = w; this.h = h;
     this.canvas = document.createElement('canvas');
-    this.canvas.width = Math.round(w * PX); this.canvas.height = Math.round(h * PX);
+    this.cw = Math.round(w * PX); this.ch = Math.round(h * PX); // logical size
+    this.canvas.width = Math.round(this.cw * RES); this.canvas.height = Math.round(this.ch * RES);
     this.ctx = this.canvas.getContext('2d');
     this.tex = new THREE.CanvasTexture(this.canvas); this.tex.colorSpace = THREE.SRGBColorSpace;
-    this.tex.anisotropy = 4;
+    this.tex.anisotropy = 8; this.tex.generateMipmaps = true; this.tex.minFilter = THREE.LinearMipmapLinearFilter;
     this.mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: this.tex, transparent: true, depthWrite: opts.depthWrite ?? true }));
     this.group = new THREE.Group(); this.group.add(this.mesh);
     this.bg = opts.bg ?? 'rgba(18,22,38,0.86)';
     this.border = opts.border ?? 'rgba(255,255,255,0.18)';
   }
   begin() {
-    const x = this.ctx, W = this.canvas.width, H = this.canvas.height;
-    x.clearRect(0, 0, W, H);
+    const x = this.ctx, W = this.cw, H = this.ch;
+    x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, this.canvas.width, this.canvas.height); x.setTransform(RES, 0, 0, RES, 0, 0);
     roundRect(x, 4, 4, W - 8, H - 8, Math.min(W, H) * 0.16);
     x.fillStyle = this.bg; x.fill(); x.lineWidth = 4; x.strokeStyle = this.border; x.stroke();
     return x;
@@ -69,7 +71,7 @@ export class Button extends Card {
   }
   draw() {
     this.bg = this.accent || 'rgba(40,52,92,0.92)';
-    const x = this.begin(), W = this.canvas.width, H = this.canvas.height;
+    const x = this.begin(), W = this.cw, H = this.ch;
     let size = H * (this.sub ? 0.36 : 0.44);
     x.font = `700 ${size}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
     const mw = x.measureText(this.label).width;

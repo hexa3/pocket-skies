@@ -3,7 +3,7 @@ import { XRHandModelFactory } from 'three/addons/webxr/XRHandModelFactory.js';
 import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 import { K, makeState, step, allBloomed, starsFor, constrainCloud, constrainSun, sunFromAngles } from './sim.js';
 import { LEVELS, dailyLevel, todayKey } from './levels.js';
-import { VIS, makeSky, makeIsland, makeDecor, makeScenery, makeRock, CloudView, SunView, PlantView, Burst, makeDomeGuide, makeHomeGarden, makeShadowCatcher, Butterflies } from './world.js';
+import { VIS, makeSky, makeIsland, makeDecor, makeScenery, makeRock, CloudView, SunView, PlantView, Burst, makeDomeGuide, makeHomeGarden, makeShadowCatcher, Butterflies, Celebrations, Waterfall } from './world.js';
 import { plan } from './agent.js';
 import { Card, Button } from './ui.js';
 import { initAudio, sfx, setRain, setMuted, setHum } from './audio.js';
@@ -57,6 +57,8 @@ setShadowBounds(1);
 
 const sunView = new SunView(); board.add(sunView.group);
 const burst = new Burst(board);
+const celebrate = new Celebrations(board);
+const waterfall = new Waterfall(island);
 const ghost = new GhostHand(board);
 
 const halo = new THREE.Mesh(new THREE.RingGeometry(0.034, 0.04, 40), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8, depthWrite: false, side: THREE.DoubleSide }));
@@ -139,6 +141,7 @@ function onWin() {
   sfx('win');
   clearHint(); spirit.say = ''; spirit.celebrate = 1.5;
   for (const p of state.plants) burst.emit(p.x, 0.06, p.z, 0xffd25e, 30, 0.15);
+  celebrate.win(stars);
   btnNext.pulse = true;
   rebuildGarden();
   refreshTiles();
@@ -164,7 +167,7 @@ function drawInfo(force) {
   infoKey = key;
   info.bg = VIS.hc ? 'rgba(0,0,0,1)' : 'rgba(18,22,38,0.86)';
   info.border = VIS.hc ? '#ffd25e' : 'rgba(255,255,255,0.18)';
-  const x = info.begin(), W = info.canvas.width, H = info.canvas.height, P = 26;
+  const x = info.begin(), W = info.cw, H = info.ch, P = 26;
   if (mrMode && mr.placing) {
     info.text('Place your island', P, P - 4, { size: 36, weight: 800 });
     info.text(mr.hasHit ? 'Look at your desk or table, then pinch to set the island down there.' : 'Look at a desk or table... or just pinch to place it right here.', P, 66, { size: 25, color: '#dbe6ff', maxW: W - P * 2 });
@@ -779,7 +782,7 @@ function updateQuality(dt, xr) {
 // ======================= Title moment =======================
 const title = new Card(0.44, 0.1, { bg: 'rgba(0,0,0,0)', border: 'rgba(0,0,0,0)' });
 title.mesh.material.depthTest = false; title.mesh.renderOrder = 50;
-{ const W = title.canvas.width; title.begin(); title.text('Pocket Skies', W / 2, 6, { size: 86, weight: 900, align: 'center', color: '#ffe9a8' }); title.text('you are the weather', W / 2, 98, { size: 30, weight: 700, align: 'center', color: '#ffffff' }); title.end(); }
+{ const W = title.cw; title.begin(); title.text('Pocket Skies', W / 2, 6, { size: 86, weight: 900, align: 'center', color: '#ffe9a8' }); title.text('you are the weather', W / 2, 98, { size: 30, weight: 700, align: 'center', color: '#ffffff' }); title.end(); }
 title.group.position.set(0, 0.12, 0.1); title.group.visible = false; board.add(title.group);
 let titleT = 0;
 function showTitle() { titleT = 4; }
@@ -891,6 +894,7 @@ renderer.setAnimationLoop((time, frame) => {
     state.plants.forEach((p, i) => { if (!p.bloomed && Math.floor(p.g * 4) > p._q) sfx('sprout', i + p._q); });
     for (const p of bloomed) {
       burst.emit(p.x, 0.05, p.z, PLANT_COLORS[p.t], 45);
+      celebrate.ring(p.x, p.z, PLANT_COLORS[p.t]);
       sfx(p.t === 'bloom' ? 'bloom' : 'bloom-' + p.t, state.plants.indexOf(p));
       butterflies.add(p.x, p.z, [0xffd25e, 0xff9ec4, 0x9fd0ff, 0xffffff, 0xc59bff][state.plants.indexOf(p) % 5]);
       if (hint) clearHint();
@@ -905,6 +909,8 @@ renderer.setAnimationLoop((time, frame) => {
   updateAssist(dt);
   updateSpirit(dt, t);
   butterflies.update(dt, t);
+  celebrate.update(dt);
+  waterfall.update(dt);
   setHum(isHeld(grabbables[0]));
   updateQuality(dt, xr);
   updateTitle(dt);

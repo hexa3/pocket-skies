@@ -29,6 +29,7 @@
   await import('/src/main.js');
   if (new URLSearchParams(location.search).has('capture')) {
     document.body.classList.add('capture');
+    if (new URLSearchParams(location.search).has('nocap')) document.head.insertAdjacentHTML('beforeend', '<style>#cap,#card{display:none !important}</style>');
     const { makeDirector } = await import('./director.js');
     window.__sfxLog = [];
     window.__makeDirector = () => { window.__director = makeDirector(); };

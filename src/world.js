@@ -605,3 +605,94 @@ export class Butterflies {
     }
   }
 }
+
+// ---------------- Bloom shockwave rings & win stars ----------------
+export class Celebrations {
+  constructor(parent) {
+    this.parent = parent;
+    this.rings = [];
+    const rg = new THREE.RingGeometry(0.9, 1, 48).rotateX(-Math.PI / 2);
+    for (let i = 0; i < 8; i++) {
+      const m = new THREE.Mesh(rg, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false }));
+      m.visible = false; m.renderOrder = 5; parent.add(m); this.rings.push({ m, t: 1 });
+    }
+    const c = document.createElement('canvas'); c.width = c.height = 128;
+    const x = c.getContext('2d');
+    x.font = '900 110px system-ui, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.shadowColor = 'rgba(255,200,60,0.9)'; x.shadowBlur = 18; x.fillStyle = '#ffd25e'; x.fillText('★', 64, 70);
+    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+    this.stars = [0, 1, 2].map(() => {
+      const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false }));
+      s.visible = false; s.renderOrder = 45; parent.add(s); return { s, t: 9, delay: 0 };
+    });
+    this.next = 0;
+  }
+  ring(x, z, color) {
+    const r = this.rings[this.next++ % this.rings.length];
+    r.t = 0; r.m.visible = true; r.m.position.set(x, 0.003, z); r.m.material.color.set(color);
+  }
+  win(n) {
+    this.stars.forEach((st, i) => { st.t = i < n ? -i * 0.25 : 9; st.s.visible = false; });
+  }
+  update(dt) {
+    for (const r of this.rings) {
+      if (!r.m.visible) continue;
+      r.t += dt * 1.6;
+      if (r.t >= 1) { r.m.visible = false; continue; }
+      r.m.scale.setScalar(0.01 + r.t * 0.11); r.m.material.opacity = 0.9 * (1 - r.t);
+    }
+    this.stars.forEach((st, i) => {
+      if (st.t > 2.4) { st.s.visible = false; return; }
+      st.t += dt;
+      if (st.t < 0) return;
+      const u = st.t;
+      st.s.visible = true;
+      const pop = u < 0.35 ? 0.035 * (u / 0.35) * 1.3 : 0.035 * (1 + 0.3 * Math.max(0, 1 - (u - 0.35) * 4));
+      st.s.scale.setScalar(pop);
+      st.s.position.set((i - 1) * 0.06, 0.12 + u * 0.05, 0.04);
+      st.s.material.opacity = u > 1.8 ? Math.max(0, 1 - (u - 1.8) / 0.6) : 1;
+    });
+  }
+}
+
+// ---------------- A little waterfall spilling off the island rim ----------------
+export class Waterfall {
+  constructor(parent, angle = 1.78) {
+    this.N = 240;
+    this.dir = new THREE.Vector3(Math.sin(angle), 0, Math.cos(angle));
+    this.origin = this.dir.clone().multiplyScalar(K.ISLAND_R - 0.012);
+    this.geo = new THREE.BufferGeometry();
+    this.pos = new Float32Array(this.N * 3);
+    this.geo.setAttribute('position', new THREE.BufferAttribute(this.pos, 3));
+    this.pts = new THREE.Points(this.geo, new THREE.PointsMaterial({ color: 0xa8d8ff, size: 0.0075, transparent: true, opacity: 0.75, depthWrite: false }));
+    this.pts.frustumCulled = false;
+    parent.add(this.pts);
+    // spring stone + a short stream channel on the grass
+    const stone = new THREE.Mesh(new THREE.DodecahedronGeometry(0.009, 0), flat(0x9fa1b0));
+    stone.position.copy(this.dir.clone().multiplyScalar(K.ISLAND_R - 0.03)).setY(0.004); stone.scale.y = 0.6;
+    const stream = new THREE.Mesh(new THREE.PlaneGeometry(0.012, 0.03).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x6fb6ff, transparent: true, opacity: 0.8 }));
+    stream.position.copy(this.dir.clone().multiplyScalar(K.ISLAND_R - 0.012)).setY(0.0012);
+    stream.rotation.y = Math.atan2(this.dir.x, this.dir.z);
+    parent.add(stone, stream);
+    this.ps = [];
+    for (let i = 0; i < this.N; i++) this.ps.push(this.spawn(Math.random() * 1.2));
+  }
+  spawn(age = 0) {
+    const side = new THREE.Vector3(-this.dir.z, 0, this.dir.x).multiplyScalar((Math.random() - 0.5) * 0.02);
+    const p = { x: this.origin.x + side.x, y: 0.001, z: this.origin.z + side.z, vx: this.dir.x * 0.06, vy: 0, vz: this.dir.z * 0.06 };
+    for (let t = 0; t < age; t += 0.05) this.stepP(p, 0.05);
+    return p;
+  }
+  stepP(p, dt) { p.vy -= 0.6 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt; }
+  update(dt) {
+    const floor = VIS.mr ? -0.185 : -0.6;
+    for (let i = 0; i < this.N; i++) {
+      const p = this.ps[i];
+      this.stepP(p, dt);
+      if (p.y < floor) this.ps[i] = this.spawn();
+      const q = this.ps[i], o = i * 3;
+      this.pos[o] = q.x; this.pos[o + 1] = q.y; this.pos[o + 2] = q.z;
+    }
+    this.geo.attributes.position.needsUpdate = true;
+  }
+}

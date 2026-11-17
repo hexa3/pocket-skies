@@ -9,7 +9,7 @@
 A tiny island sits on your real desk and you are its weather. Pinch the sun, drag the clouds and bloom a garden with just your hands.
 
 ## Gallery
-`media/01-first-light-tutorial.png`, `media/02-two-sides-shadow-puzzle.png`, `media/03-eclipse-cloud-parasol.png`, `media/04-grand-garden-bloomed.png`
+Cover/thumbnail: `media/00-cover.jpg`. Then `media/05-pinch-the-sun.jpg`, `media/06-rain-and-light.jpg`, `media/07-garden-and-streak.jpg`, `media/01-first-light-tutorial.png`, `media/02-two-sides-shadow-puzzle.png`, `media/03-eclipse-cloud-parasol.png`, `media/04-grand-garden-bloomed.png`
 
 ## Description
 
