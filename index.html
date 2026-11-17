@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>Pocket Skies</title>
+  <meta name="description" content="A hands-first VR/MR puzzle garden: pinch the sun, drag the clouds, bloom a tiny island in your lap." />
+  <style>
+    :root { --ink: #f4f6ff; --dim: #b8c3e6; --accent: #ffd25e; --bg: #141a30; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #9cc3ef; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink); }
+    canvas { display: block; touch-action: none; }
+    #overlay { position: fixed; inset: 0; display: grid; place-items: center; padding: 16px;
+      background: radial-gradient(circle at 50% 30%, rgba(255,210,94,0.35), transparent 50%), linear-gradient(180deg, rgba(40,60,120,0.72), rgba(20,26,48,0.9)); transition: opacity .35s; z-index: 5; }
+    #overlay.hidden { opacity: 0; pointer-events: none; }
+    .card { max-width: 560px; width: 100%; text-align: center; }
+    h1 { font-size: clamp(40px, 9vw, 72px); margin: 0 0 6px; letter-spacing: -0.02em; }
+    h1 span { color: var(--accent); }
+    p { color: var(--dim); font-size: 17px; line-height: 1.5; margin: 8px 0 22px; }
+    .btns { display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
+    button { font: inherit; font-size: 18px; font-weight: 700; padding: 14px 18px; border-radius: 14px; border: 0; cursor: pointer; color: #141a30; background: var(--accent); }
+    button.alt { background: rgba(255,255,255,0.12); color: var(--ink); border: 1px solid rgba(255,255,255,0.25); }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .small { font-size: 13px; color: var(--dim); margin-top: 16px; }
+    #help { position: fixed; left: 12px; bottom: 10px; right: 12px; font-size: 13px; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.6); pointer-events: none; z-index: 2; }
+  </style>
+</head>
+<body>
+  <div id="overlay">
+    <div class="card">
+      <h1>Pocket <span>Skies</span></h1>
+      <p>A tiny island floats in your lap. You are its weather.<br/>Pinch the sun, drag the clouds and bloom every plant. No controllers needed.</p>
+      <div class="btns">
+        <button id="btn-mr" disabled>Play in Mixed Reality (on your desk)</button>
+        <button id="btn-vr" class="alt" disabled>Play in VR (floating sky)</button>
+        <button id="btn-web" class="alt">Try in the browser with a mouse</button>
+      </div>
+      <div class="small">Hands-first · seated · one hand is enough · about 1 minute per island · new Daily Island every day</div>
+    </div>
+  </div>
+  <div id="help">Drag the sun and clouds · drag empty space to look around · scroll to zoom · R retry · N next · L islands · M sound</div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

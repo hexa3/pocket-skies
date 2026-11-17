@@ -1,0 +1,45 @@
+# Pocket Skies
+
+**A tiny island floats in your lap. You are its weather.**
+
+Pocket Skies is a hands-first, seated puzzle garden for Meta Quest, playable in VR or in mixed reality on your real desk. You pinch the sun to swing it across the sky and pinch clouds to drift them over the island. Every plant wants something different:
+
+| Plant | Needs | Ring shows |
+|---|---|---|
+| Sunbloom | sunlight + moist soil | growth (outer) / moisture with target band (inner) |
+| Shade fern | shadow + moist soil | |
+| Sun cactus | sunlight + dry soil | |
+
+Rocks and clouds cast **real shadows**, and rain falls **straight down**. A cloud that waters a flower also shades it, unless you tilt the sun low enough that the shadow lands somewhere else. That one physical rule produces all the puzzles.
+
+- 10 handcrafted islands that each teach one idea in under a minute
+- **Daily Island**: one procedurally grown island per day, the same for everyone, with a streak counter
+- Stars for beating par time, no fail states, and no time pressure
+- 100% procedural: no downloaded art or audio, so it cold-starts in a couple of seconds
+
+## Controls
+
+| Action | Hands (primary) | Controllers | Browser |
+|---|---|---|---|
+| Move the sun / a cloud | Pinch it (thumb + index) and move | Grip near it or point + trigger | Drag |
+| Far reach | Point your hand ray at it and pinch | Point + trigger | – |
+| Buttons | Poke with a fingertip, or point + pinch | Point + trigger | Click |
+
+The console under the island has: Islands, Retry, Next, Bigger/Smaller, Recenter and Sound.
+
+## Run
+
+```bash
+npm install
+npm run dev        # https is required on Quest; use `npx vite --host` + a tunnel, or deploy
+npm test           # solvability check of every level + 365 daily islands
+npm run build      # static site in dist/
+```
+
+Pushing to `main` deploys to GitHub Pages via `.github/workflows/pages.yml`.
+
+`test/xr.html` boots the game inside **IWER** (Meta's Immersive Web Emulation Runtime) with an emulated Quest 3 and tracked hands. It is useful for automated hand-interaction tests on a desktop.
+
+## Tech
+
+Three.js + WebXR (`immersive-vr` and `immersive-ar`, `hand-tracking`, `local-floor`). Logic runs in `src/sim.js`, a pure module with no DOM or three.js, so it is unit-testable. Light is a segment-vs-sphere test from each plant to the sun against rocks and clouds, and the shadow map renders the same occluders, so what you see is what the plant gets.
