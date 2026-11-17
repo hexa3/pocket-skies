@@ -3,9 +3,10 @@ import { XRHandModelFactory } from 'three/addons/webxr/XRHandModelFactory.js';
 import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 import { K, makeState, step, allBloomed, starsFor, constrainCloud, constrainSun, sunFromAngles } from './sim.js';
 import { LEVELS, dailyLevel, todayKey } from './levels.js';
-import { VIS, makeSky, makeIsland, makeDecor, makeScenery, makeRock, CloudView, SunView, PlantView, Burst, makeDomeGuide, makeHomeGarden, makeShadowCatcher } from './world.js';
+import { VIS, makeSky, makeIsland, makeDecor, makeScenery, makeRock, CloudView, SunView, PlantView, Burst, makeDomeGuide, makeHomeGarden, makeShadowCatcher, Butterflies } from './world.js';
+import { plan } from './agent.js';
 import { Card, Button } from './ui.js';
-import { initAudio, sfx, setRain, setMuted } from './audio.js';
+import { initAudio, sfx, setRain, setMuted, setHum } from './audio.js';
 import { GhostHand } from './tutorial.js';
 import { MRPlacement } from './mr.js';
 
@@ -97,6 +98,7 @@ function loadLevel(def) {
     ...cloudViews.map((v) => ({ kind: 'cloud', pos: v.cloud, r: v.cloud.r * 1.25, view: v })),
   ];
   timer = 0; started = false; won = false; introT = 0; idleT = 0; grabbedKinds = new Set(); unlockMsg = '';
+  butterflies.clear(); clearHint(); assist = null;
   for (const h of allHolders()) h.held = null;
   openMenu(null);
   btnNext.pulse = false;
@@ -130,6 +132,7 @@ function onWin() {
   const tierAfter = sunTier();
   unlockMsg = tierAfter !== tierBefore ? `New: ${tierAfter[2]} unlocked!` : '';
   sfx('win');
+  clearHint(); spirit.say = ''; spirit.celebrate = 1.5;
   for (const p of state.plants) burst.emit(p.x, 0.06, p.z, 0xffd25e, 30, 0.15);
   btnNext.pulse = true;
   rebuildGarden();
@@ -151,7 +154,7 @@ function drawInfo(force) {
   const n = state.plants.filter((p) => p.bloomed).length, N = state.plants.length;
   const t = won ? wonTime : timer;
   const mrKey = mrMode ? `${mr.placing}|${mr.hasHit}` : '';
-  const key = `${levelDef.id}|${n}|${Math.floor(t)}|${won}|${paused}|${save.streak}|${mrKey}|${VIS.hc}|${SHOW_FPS ? Math.round(fps) : ''}`;
+  const key = `${spirit.say}|${idleT > 20}|${levelDef.id}|${n}|${Math.floor(t)}|${won}|${paused}|${save.streak}|${mrKey}|${VIS.hc}|${SHOW_FPS ? Math.round(fps) : ''}`;
   if (!force && key === infoKey) return;
   infoKey = key;
   info.bg = VIS.hc ? 'rgba(0,0,0,1)' : 'rgba(18,22,38,0.86)';
@@ -174,8 +177,9 @@ function drawInfo(force) {
       : s < 3 ? `+${s} flower${s > 1 ? 's' : ''} for your garden. Beat ${fmt(levelDef.par)} for 3 stars.` : `+3 flowers for your garden. Poke NEXT!`);
     info.text(msg, P, 112, { size: 24, color: unlockMsg ? '#ffd25e' : '#cfe0ff', maxW: W - P * 2 });
   } else {
-    info.text(levelDef.hint, P, 62, { size: 24, color: '#dbe6ff', maxW: W - P * 2, weight: 500 });
-    const foot = paused ? 'Paused' : `Blooms ${n}/${N}   ·   ${fmt(t)}   ·   par ${fmt(levelDef.par)}${SHOW_FPS ? `   ·   ${Math.round(fps)} fps` : ''}`;
+    if (spirit.say) { info.text('✦ ' + spirit.say, P, 62, { size: 24, color: '#e6c8ff', maxW: W - P * 2, weight: 600 }); }
+    else info.text(levelDef.hint, P, 62, { size: 24, color: '#dbe6ff', maxW: W - P * 2, weight: 500 });
+    const foot = paused ? 'Paused' : idleT > 20 && !spirit.say ? 'Stuck? Poke HINT and the Sky Spirit will help.' : `Blooms ${n}/${N}   ·   ${fmt(t)}   ·   par ${fmt(levelDef.par)}${SHOW_FPS ? `   ·   ${Math.round(fps)} fps q${quality.tier}` : ''}`;
     info.text(foot, P, H - 42, { size: 22, color: '#ffd25e' });
   }
   info.end();
@@ -190,11 +194,12 @@ const buttons = [];
 const addBtn = (label, onPress, parent, x, y, w = 0.07, h = 0.038, opts) => {
   const b = new Button(label, w, h, onPress, opts); b.group.position.set(x, y, 0); parent.add(b.group); buttons.push(b); return b;
 };
-const cw = 0.076;
-const btnLevels = addBtn('Islands', () => openMenu(menu === 'levels' ? null : 'levels'), consoleGrp, -1.5 * cw, 0);
-const btnRetry = addBtn('Retry', () => loadLevel(levelDef.daily ? dailyLevel(levelDef.daily) : levelDef), consoleGrp, -0.5 * cw, 0);
-const btnNext = addBtn('Next', () => nextLevel(), consoleGrp, 0.5 * cw, 0, 0.07, 0.038, { accent: 'rgba(40,120,80,0.95)' });
-const btnOpts = addBtn('Options', () => openMenu(menu === 'options' ? null : 'options'), consoleGrp, 1.5 * cw, 0);
+const cw = 0.074;
+const btnLevels = addBtn('Islands', () => openMenu(menu === 'levels' ? null : 'levels'), consoleGrp, -2 * cw, 0, 0.068);
+const btnRetry = addBtn('Retry', () => loadLevel(levelDef.daily ? dailyLevel(levelDef.daily) : levelDef), consoleGrp, -1 * cw, 0, 0.068);
+const btnHint = addBtn('Hint', () => onHint(), consoleGrp, 0, 0, 0.068, 0.038, { accent: 'rgba(110,60,160,0.95)' });
+const btnNext = addBtn('Next', () => nextLevel(), consoleGrp, 1 * cw, 0, 0.068, 0.038, { accent: 'rgba(40,120,80,0.95)' });
+const btnOpts = addBtn('Options', () => openMenu(menu === 'options' ? null : 'options'), consoleGrp, 2 * cw, 0, 0.068);
 
 // ---- pop-up panels (level select / options) float over the island ----
 function makePopup(title) {
@@ -329,6 +334,7 @@ function beginHold(holder, target, ctx) {
     if (ctx.via === 'mouse') { h.planeN = r.d.clone().negate(); h.planeHit = rayPlane(r, h.start, h.planeN) || h.start.clone(); }
   }
   holder.held = h;
+  if (hint && hint.g === g) clearHint();
   started = true; grabbedKinds.add(g.kind); idleT = 0;
   sfx('grab'); pulse(holder, 0.5, 30);
 }
@@ -540,6 +546,7 @@ addEventListener('keydown', (e) => {
   if (k === 'n') btnNext.press();
   if (k === 'l') btnLevels.press();
   if (k === 'o') btnOpts.press();
+  if (k === 'h') btnHint.press();
   if (k === 'm') oSound.press();
 });
 function placeDesktopCamera() {
@@ -600,7 +607,7 @@ async function startSession(mode) {
     xrSession = session;
     mrMode = mode === 'immersive-ar';
     sky.visible = scenery.visible = !mrMode;
-    shadowCatcher.visible = mrMode;
+    shadowCatcher.visible = mrMode; VIS.mr = mrMode; showTitle();
     renderer.setClearAlpha(mrMode ? 0 : 1);
     await renderer.xr.setSession(session);
     renderer.xr.setFoveation?.(1);
@@ -612,7 +619,7 @@ async function startSession(mode) {
     session.addEventListener('visibilitychange', () => { paused = session.visibilityState !== 'visible'; });
     session.addEventListener('end', () => {
       mr.end(); xrSession = null;
-      sky.visible = scenery.visible = true; shadowCatcher.visible = false; mrMode = false; paused = false;
+      sky.visible = scenery.visible = true; shadowCatcher.visible = false; mrMode = false; VIS.mr = false; paused = false; quality.tier = 0; applyQuality();
       board.position.set(0, 0.95, -0.5); board.rotation.set(0, 0, 0);
       refreshTiles(); drawInfo(true);
       overlay.classList.remove('hidden');
@@ -638,7 +645,7 @@ function recenter(frame) {
 }
 document.getElementById('btn-vr').addEventListener('click', () => startSession('immersive-vr'));
 document.getElementById('btn-mr').addEventListener('click', () => startSession('immersive-ar'));
-document.getElementById('btn-web').addEventListener('click', () => { initAudio(); overlay.classList.add('hidden'); });
+document.getElementById('btn-web').addEventListener('click', () => { initAudio(); overlay.classList.add('hidden'); showTitle(); });
 if (navigator.xr) {
   navigator.xr.isSessionSupported('immersive-vr').then((ok) => { if (ok) document.getElementById('btn-vr').disabled = false; }).catch(() => {});
   navigator.xr.isSessionSupported('immersive-ar').then((ok) => { if (ok) document.getElementById('btn-mr').disabled = false; }).catch(() => {});
@@ -652,6 +659,9 @@ const TUT = {
   l4: () => grabbables[1] && ({ g: grabbables[1], to: new THREE.Vector3(0.17, grabbables[1].pos.y, 0.1) }),
 };
 function updateTutorial() {
+  if (hint && hint.g && !allHolders().some((h) => h.held) && !assist && !menu) {
+    ghost.show('pinch', new THREE.Vector3(hint.g.pos.x, hint.g.pos.y, hint.g.pos.z), hint.to); halo.visible = false; return;
+  }
   const anyHeld = allHolders().some((h) => h.held);
   if (menu || anyHeld || (mrMode && mr.placing)) { ghost.hide(); halo.visible = false; return; }
   if (won) {
@@ -672,6 +682,98 @@ function updateTutorial() {
     halo.visible = true;
     halo.position.copy(from);
   } else { ghost.hide(); halo.visible = false; }
+}
+
+// ======================= Sky Spirit (context-aware planning agent) =======================
+// A little wisp that reads the garden, plans the next move with the real light model (agent.js),
+// explains it in plain words, shows it with the ghost hand, and on a second press does it for you.
+const butterflies = new Butterflies(board);
+function glowTex(c1, c2) {
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const x = c.getContext('2d'), g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+  g.addColorStop(0, c1); g.addColorStop(0.35, c2); g.addColorStop(1, 'rgba(0,0,0,0)');
+  x.fillStyle = g; x.fillRect(0, 0, 64, 64);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+const spirit = { say: '', celebrate: 0, home: new THREE.Vector3(-0.23, 0.16, 0.06), pos: new THREE.Vector3(-0.23, 0.16, 0.06), sayT: 0 };
+spirit.sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex('rgba(255,255,255,1)', 'rgba(200,150,255,0.6)'), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+spirit.sprite.scale.setScalar(0.05); spirit.sprite.renderOrder = 25;
+spirit.trail = new Burst(board);
+board.add(spirit.sprite);
+let hint = null, assist = null;
+function clearHint() { hint = null; btnHint.set('Hint'); }
+function onHint() {
+  if (won || gameLocked()) return;
+  sfx('spirit');
+  if (hint && hint.g) { // second press: the spirit does it for you (motor-accessibility assist)
+    assist = { g: hint.g, from: new THREE.Vector3(hint.g.pos.x, hint.g.pos.y, hint.g.pos.z), to: hint.to.clone(), t: 0 };
+    started = true; spirit.say = 'Here, let me help.'; spirit.sayT = 3; clearHint(); return;
+  }
+  const a = plan(state);
+  if (!a) return;
+  spirit.say = a.say; spirit.sayT = 9;
+  if (a.kind === 'sun' || a.kind === 'cloud') {
+    hint = { g: a.kind === 'sun' ? grabbables[0] : grabbables[1 + a.index], to: new THREE.Vector3(a.to.x, a.to.y, a.to.z) };
+    btnHint.set('Do it');
+  } else clearHint();
+  idleT = 0;
+}
+function updateAssist(dt) {
+  if (!assist) return;
+  assist.t = Math.min(1, assist.t + dt / 1.3);
+  const k = assist.t < 0.5 ? 2 * assist.t * assist.t : 1 - Math.pow(-2 * assist.t + 2, 2) / 2;
+  const p = assist.from.clone().lerp(assist.to, k);
+  if (assist.g.kind === 'cloud') constrainCloud(p); else constrainSun(p);
+  Object.assign(assist.g.pos, { x: p.x, y: p.y, z: p.z });
+  if (assist.t >= 1) assist = null;
+}
+function updateSpirit(dt, t) {
+  const target = assist ? new THREE.Vector3(assist.g.pos.x, assist.g.pos.y + 0.035, assist.g.pos.z)
+    : hint ? new THREE.Vector3(hint.g.pos.x, hint.g.pos.y + 0.04, hint.g.pos.z) : spirit.home;
+  spirit.pos.lerp(target, Math.min(1, dt * 3));
+  const bob = Math.sin(t * 2.2) * 0.008;
+  let x = spirit.pos.x, y = spirit.pos.y + bob, z = spirit.pos.z;
+  if (spirit.celebrate > 0) { spirit.celebrate -= dt; const a = t * 6; x += Math.cos(a) * 0.05; z += Math.sin(a) * 0.05; y += 0.03; }
+  spirit.sprite.position.set(x, y, z);
+  const glow = 0.045 + 0.008 * Math.sin(t * 5) + (idleT > 20 && !won ? 0.02 * Math.abs(Math.sin(t * 3)) : 0);
+  spirit.sprite.scale.setScalar(glow);
+  spirit.sprite.visible = !menu && !(mrMode && mr.placing);
+  if (Math.random() < dt * 14) spirit.trail.emit(x, y, z, 0xd8b8ff, 1, 0.01);
+  spirit.trail.update(dt);
+  if (spirit.sayT > 0) { spirit.sayT -= dt; if (spirit.sayT <= 0 && !hint) spirit.say = ''; }
+}
+
+// ======================= Adaptive quality (keeps Quest above 60 fps) =======================
+const quality = { tier: 0, acc: 0, n: 0, warm: 0 };
+function applyQuality() {
+  const size = quality.tier >= 1 ? 512 : 1024;
+  if (sunLight.shadow.mapSize.x !== size) { sunLight.shadow.mapSize.set(size, size); sunLight.shadow.map?.dispose(); sunLight.shadow.map = null; }
+  scenery.visible = !mrMode && quality.tier < 2;
+  sunLight.castShadow = quality.tier < 3;
+}
+function updateQuality(dt, xr) {
+  if (!xr) { quality.warm = 0; return; }
+  quality.warm += dt; if (quality.warm < 4) return; // let the session settle
+  quality.acc += dt; quality.n++;
+  if (quality.acc >= 2) {
+    const f = quality.n / quality.acc; quality.acc = 0; quality.n = 0;
+    const target = xrSession?.frameRate || 72; // headset refresh rate
+    if (f < target * 0.85 && quality.tier < 3) { quality.tier++; applyQuality(); }
+  }
+}
+
+// ======================= Title moment =======================
+const title = new Card(0.44, 0.1, { bg: 'rgba(0,0,0,0)', border: 'rgba(0,0,0,0)' });
+title.mesh.material.depthTest = false; title.mesh.renderOrder = 50;
+{ const W = title.canvas.width; title.begin(); title.text('Pocket Skies', W / 2, 6, { size: 86, weight: 900, align: 'center', color: '#ffe9a8' }); title.text('you are the weather', W / 2, 98, { size: 30, weight: 700, align: 'center', color: '#ffffff' }); title.end(); }
+title.group.position.set(0, 0.12, 0.1); title.group.visible = false; board.add(title.group);
+let titleT = 0;
+function showTitle() { titleT = 4; }
+function updateTitle(dt) {
+  titleT = Math.max(0, titleT - dt);
+  title.group.visible = titleT > 0;
+  info.group.visible = titleT <= 0.8;
+  if (titleT > 0) { title.mesh.material.opacity = Math.min(1, titleT / 1, (4 - titleT) / 0.6); title.group.position.y = 0.12 + (4 - titleT) * 0.008; }
 }
 
 // ======================= Main loop =======================
@@ -757,14 +859,25 @@ renderer.setAnimationLoop((time, frame) => {
     for (const p of state.plants) p._q = Math.floor(p.g * 4);
     const bloomed = step(state, dt);
     state.plants.forEach((p, i) => { if (!p.bloomed && Math.floor(p.g * 4) > p._q) sfx('sprout', i + p._q); });
-    for (const p of bloomed) { burst.emit(p.x, 0.05, p.z, PLANT_COLORS[p.t], 45); sfx('bloom', state.plants.indexOf(p)); }
+    for (const p of bloomed) {
+      burst.emit(p.x, 0.05, p.z, PLANT_COLORS[p.t], 45);
+      sfx(p.t === 'bloom' ? 'bloom' : 'bloom-' + p.t, state.plants.indexOf(p));
+      butterflies.add(p.x, p.z, [0xffd25e, 0xff9ec4, 0x9fd0ff, 0xffffff, 0xc59bff][state.plants.indexOf(p) % 5]);
+      if (hint) clearHint();
+    }
     if (allBloomed(state)) onWin();
   }
 
   // ---- visuals ----
   introT = Math.min(1, introT + dt * 2.5);
   content.scale.setScalar(0.6 + 0.4 * (1 - Math.pow(1 - introT, 3)));
-  const isHeld = (g) => allHolders().some((h) => h.held?.g === g);
+  const isHeld = (g) => allHolders().some((h) => h.held?.g === g) || assist?.g === g;
+  updateAssist(dt);
+  updateSpirit(dt, t);
+  butterflies.update(dt, t);
+  setHum(isHeld(grabbables[0]));
+  updateQuality(dt, xr);
+  updateTitle(dt);
   for (const v of plantViews) v.update(dt, t);
   cloudViews.forEach((v, i) => v.update(dt, t, isHeld(grabbables[i + 1])));
   camLocal.copy(camW); board.worldToLocal(camLocal);
@@ -820,4 +933,4 @@ applySize();
 rebuildGarden();
 refreshTiles();
 loadLevel(LEVELS[0]);
-if (DEBUG) window.__ps = { get state() { return state; }, inputs, renderer, camera, board, THREE, loadLevel, LEVELS, dailyLevel, mr, ghost, save, btns: { btnNext, btnRetry, btnLevels, btnOpts }, opts: { oHC, oGaze, oSize }, get fps() { return fps; } };
+if (DEBUG) window.__ps = { get spirit() { return spirit; }, btnHint, quality, get state() { return state; }, inputs, renderer, camera, board, THREE, loadLevel, LEVELS, dailyLevel, mr, ghost, save, btns: { btnNext, btnRetry, btnLevels, btnOpts }, opts: { oHC, oGaze, oSize }, get fps() { return fps; } };

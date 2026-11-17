@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { K, NEEDS, rockSpheres, waterState, happy } from './sim.js';
 
-export const VIS = { hc: false };
+export const VIS = { hc: false, mr: false };
 
 // Merge every non-instanced mesh under `group` into one mesh per material (fewer draw calls on Quest).
 export function bake(group) {
@@ -59,6 +59,9 @@ export function makeSky() {
         vec3 col = mix(hor, zen, smoothstep(0.0, 0.7, y));
         vec3 sea = mix(vec3(0.85,0.72,0.80), vec3(0.93,0.95,1.0), uDay);
         col = mix(col, sea, smoothstep(0.02, -0.12, y));
+        vec3 cell = floor(normalize(vDir) * 260.0);
+        float h = fract(sin(dot(cell, vec3(12.9898, 78.233, 45.164))) * 43758.5453);
+        col += vec3(1.0, 0.95, 0.85) * step(0.9965, h) * smoothstep(0.05, 0.3, y) * (1.0 - uDay) * 0.9;
         float s = max(dot(normalize(vDir), normalize(uSun)), 0.0);
         col += vec3(1.0,0.85,0.55) * (pow(s, 64.0)*0.8 + pow(s, 6.0)*0.18);
         gl_FragColor = vec4(col, 1.0);
@@ -158,6 +161,13 @@ export class CloudView {
     const ring = new THREE.RingGeometry(cloud.r * 0.92, cloud.r, 40); ring.rotateX(-Math.PI / 2);
     this.foot = new THREE.Mesh(ring, new THREE.MeshBasicMaterial({ color: 0x4f8fff, transparent: true, opacity: 0.45, depthWrite: false }));
     this.group.add(this.foot);
+    this.splashes = [];
+    const sg = new THREE.RingGeometry(0.6, 1, 16).rotateX(-Math.PI / 2);
+    for (let i = 0; i < 8; i++) {
+      const m = new THREE.Mesh(sg, new THREE.MeshBasicMaterial({ color: 0xbfe0ff, transparent: true, opacity: 0, depthWrite: false }));
+      m.visible = false; this.group.add(m); this.splashes.push({ m, t: 1 });
+    }
+    this.nextSplash = 0;
     this.hover = 0;
   }
   newDrop(init) {
@@ -171,11 +181,25 @@ export class CloudView {
     for (let i = 0; i < this.N; i++) {
       const d = this.drops[i];
       d.y -= d.v * dt;
-      if (d.y < -c.y) this.drops[i] = this.newDrop(false);
+      const off = Math.hypot(c.x + d.x, c.z + d.z) > K.ISLAND_R;
+      const ground = -c.y + (off ? (VIS.mr ? -0.185 : -0.5) : 0.001);
+      if (d.y < ground) {
+        if (i % 3 === 0 && (!off || VIS.mr)) {
+          const s = this.splashes[this.nextSplash++ % this.splashes.length];
+          s.t = 0; s.m.position.set(d.x, ground + 0.001, d.z); s.m.visible = true;
+        }
+        this.drops[i] = this.newDrop(false);
+      }
       const q = this.drops[i], o = i * 6;
       p[o] = q.x; p[o + 1] = q.y; p[o + 2] = q.z; p[o + 3] = q.x; p[o + 4] = q.y - 0.012; p[o + 5] = q.z;
     }
     this.rainGeo.attributes.position.needsUpdate = true;
+    for (const s of this.splashes) {
+      if (!s.m.visible) continue;
+      s.t += dt * 2.5;
+      if (s.t >= 1) { s.m.visible = false; continue; }
+      s.m.scale.setScalar(0.002 + s.t * 0.01); s.m.material.opacity = 0.7 * (1 - s.t);
+    }
     this.foot.position.y = -c.y + 0.002;
     const target = held ? 1.12 : this.hover ? 1.07 : 1;
     const s = this.body.scale.x + (target - this.body.scale.x) * Math.min(1, dt * 12);
@@ -550,4 +574,34 @@ export function makeShadowCatcher() {
   const m = new THREE.Mesh(new THREE.CircleGeometry(0.6, 48).rotateX(-Math.PI / 2), new THREE.ShadowMaterial({ opacity: 0.35 }));
   m.receiveShadow = true; m.visible = false;
   return m;
+}
+
+// ---------------- Butterflies visit every bloomed flower ----------------
+export class Butterflies {
+  constructor(parent) {
+    this.group = new THREE.Group(); parent.add(this.group);
+    this.list = [];
+    this.wingGeo = new THREE.PlaneGeometry(0.011, 0.009).translate(0.0055, 0, 0);
+  }
+  clear() { this.group.clear(); this.list = []; }
+  add(x, z, color) {
+    if (this.list.length >= 10) return;
+    const g = new THREE.Group();
+    const mat = new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide, transparent: true, opacity: 0.95 });
+    const l = new THREE.Mesh(this.wingGeo, mat), r = new THREE.Mesh(this.wingGeo, mat);
+    r.scale.x = -1;
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.0012, 0.006, 2, 4).rotateX(Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x222233 }));
+    g.add(l, r, body); this.group.add(g);
+    this.list.push({ g, l, r, x, z, a: Math.random() * 6.28, rad: 0.025 + Math.random() * 0.02, h: 0.06 + Math.random() * 0.03, sp: 0.8 + Math.random() * 0.6, ph: Math.random() * 6 });
+  }
+  update(dt, t) {
+    for (const b of this.list) {
+      b.a += dt * b.sp;
+      b.g.position.set(b.x + Math.cos(b.a) * b.rad, b.h + Math.sin(t * 2 + b.ph) * 0.01, b.z + Math.sin(b.a) * b.rad);
+      b.g.rotation.y = -b.a;
+      const f = Math.sin(t * 22 + b.ph) * 1.1;
+      b.l.rotation.y = f; b.r.rotation.y = -f;
+      b.g.rotation.z = 0.3;
+    }
+  }
 }

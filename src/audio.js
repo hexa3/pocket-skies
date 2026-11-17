@@ -55,7 +55,29 @@ export function sfx(name, i = 0) {
       const n = PENTA[(i * 3) % PENTA.length];
       tone(hz(n), t, 1.2, 0.12); tone(hz(n + 12), t + 0.06, 0.9, 0.05, 'triangle'); break;
     }
+    case 'bloom-fern': { // airy shimmer
+      const n = PENTA[(i * 3 + 2) % PENTA.length];
+      [0, 7, 12, 19].forEach((s, k) => tone(hz(n + s, 659.25), t + k * 0.05, 0.9, 0.04, 'triangle')); break;
+    }
+    case 'bloom-cactus': { // woody marimba
+      const n = PENTA[(i * 3 + 1) % PENTA.length];
+      tone(hz(n, 392), t, 0.35, 0.14); tone(hz(n + 24, 392), t, 0.12, 0.05, 'square'); tone(hz(n + 7, 392), t + 0.12, 0.3, 0.1); break;
+    }
+    case 'spirit': [12, 16, 19, 24, 28].forEach((s, k) => tone(hz(s, 659.25), t + k * 0.04, 0.6, 0.035, 'triangle')); break;
     case 'win': [0, 4, 7, 12, 16, 19, 24].forEach((s, k) => tone(hz(s), t + k * 0.09, 1.4, 0.09, k % 2 ? 'triangle' : 'sine')); break;
     case 'sprout': tone(hz(PENTA[i % PENTA.length], 880), t, 0.25, 0.025); break;
   }
+}
+
+// A soft warm hum while you hold the sun.
+let hum = null;
+export function setHum(on) {
+  if (!ctx || muted) { if (hum) { hum.g.gain.setTargetAtTime(0, ctx.currentTime, 0.1); } return; }
+  if (!hum) {
+    const o = ctx.createOscillator(), o2 = ctx.createOscillator(), g = ctx.createGain();
+    o.type = 'sine'; o.frequency.value = 196; o2.type = 'triangle'; o2.frequency.value = 293.7;
+    g.gain.value = 0; o.connect(g); o2.connect(g); g.connect(master); o.start(); o2.start();
+    hum = { g };
+  }
+  hum.g.gain.setTargetAtTime(on ? 0.03 : 0, ctx.currentTime, 0.15);
 }

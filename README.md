@@ -17,6 +17,7 @@ Rocks and clouds cast **real shadows**, and rain falls **straight down**. A clou
 - Stars for beating par time, no fail states, and no time pressure
 - **Mixed reality:** set the island on your real desk (hit-test + plane detection). A persistent anchor brings it back to the same spot next time, and the island and clouds cast shadows onto your real table
 - **Show-don't-tell onboarding:** an animated hand icon demonstrates each gesture on the real object
+- **Sky Spirit:** a planning agent (`src/agent.js`) that diagnoses unhappy plants, searches sun and cloud positions with the real light model, explains the next move, shows it, and can perform it (**Do it**). It solves every level by itself (`test/agent.test.js`)
 - **Home garden:** one permanent flower per star, a streak tree for Daily Islands, and unlockable sun colors
 - **Accessibility:** one-handed play, far pinch, eye gaze + pinch, a fully hands-free head-gaze dwell mode, high contrast and a Bigger island
 - **FoV-aware:** reads the headset's per-eye field of view and fits the whole play space inside it (Quest 3 and Meta VR Glasses)
