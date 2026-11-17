@@ -15,6 +15,11 @@ Rocks and clouds cast **real shadows**, and rain falls **straight down**. A clou
 - 10 handcrafted islands that each teach one idea in under a minute
 - **Daily Island**: one procedurally grown island per day, the same for everyone, with a streak counter
 - Stars for beating par time, no fail states, and no time pressure
+- **Mixed reality:** set the island on your real desk (hit-test + plane detection). A persistent anchor brings it back to the same spot next time, and the island and clouds cast shadows onto your real table
+- **Show-don't-tell onboarding:** an animated hand icon demonstrates each gesture on the real object
+- **Home garden:** one permanent flower per star, a streak tree for Daily Islands, and unlockable sun colors
+- **Accessibility:** one-handed play, far pinch, eye gaze + pinch, a fully hands-free head-gaze dwell mode, high contrast and a Bigger island
+- **FoV-aware:** reads the headset's per-eye field of view and fits the whole play space inside it (Quest 3 and Meta VR Glasses)
 - 100% procedural: no downloaded art or audio, so it cold-starts in a couple of seconds
 
 ## Controls
@@ -38,7 +43,9 @@ npm run build      # static site in dist/
 
 Pushing to `main` deploys to GitHub Pages via `.github/workflows/pages.yml`.
 
-`test/xr.html` boots the game inside **IWER** (Meta's Immersive Web Emulation Runtime) with an emulated Quest 3 and tracked hands. It is useful for automated hand-interaction tests on a desktop.
+URL flags: `?fps` shows a frame counter, `?debug` exposes `window.__ps` for automated tests, and `?fov=glasses` forces the narrow VR Glasses layout.
+
+`test/xr.html?debug` (add `&device=glasses` for VR Glasses) boots the game inside **IWER** (Meta's Immersive Web Emulation Runtime) with an emulated Quest 3 and tracked hands. It is useful for automated hand-interaction tests on a desktop.
 
 ## Tech
 

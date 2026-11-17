@@ -11,6 +11,7 @@ import { MRPlacement } from './mr.js';
 
 const params = new URLSearchParams(location.search);
 const DEBUG = params.has('debug');
+const SHOW_FPS = params.has('fps');
 
 // ======================= Renderer / scene =======================
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
@@ -150,7 +151,7 @@ function drawInfo(force) {
   const n = state.plants.filter((p) => p.bloomed).length, N = state.plants.length;
   const t = won ? wonTime : timer;
   const mrKey = mrMode ? `${mr.placing}|${mr.hasHit}` : '';
-  const key = `${levelDef.id}|${n}|${Math.floor(t)}|${won}|${paused}|${save.streak}|${mrKey}|${VIS.hc}|${DEBUG ? Math.round(fps) : ''}`;
+  const key = `${levelDef.id}|${n}|${Math.floor(t)}|${won}|${paused}|${save.streak}|${mrKey}|${VIS.hc}|${SHOW_FPS ? Math.round(fps) : ''}`;
   if (!force && key === infoKey) return;
   infoKey = key;
   info.bg = VIS.hc ? 'rgba(0,0,0,1)' : 'rgba(18,22,38,0.86)';
@@ -174,7 +175,7 @@ function drawInfo(force) {
     info.text(msg, P, 112, { size: 24, color: unlockMsg ? '#ffd25e' : '#cfe0ff', maxW: W - P * 2 });
   } else {
     info.text(levelDef.hint, P, 62, { size: 24, color: '#dbe6ff', maxW: W - P * 2, weight: 500 });
-    const foot = paused ? 'Paused' : `Blooms ${n}/${N}   ·   ${fmt(t)}   ·   par ${fmt(levelDef.par)}${DEBUG ? `   ·   ${Math.round(fps)} fps` : ''}`;
+    const foot = paused ? 'Paused' : `Blooms ${n}/${N}   ·   ${fmt(t)}   ·   par ${fmt(levelDef.par)}${SHOW_FPS ? `   ·   ${Math.round(fps)} fps` : ''}`;
     info.text(foot, P, H - 42, { size: 22, color: '#ffd25e' });
   }
   info.end();
